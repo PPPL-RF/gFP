@@ -44,7 +44,7 @@ OptionsParser args(argc, argv);
 
 
 
-  const char *mesh_file = "../../data/semi_circle3.msh";
+  const char *mesh_file = "./data/semi_circle3.msh";
   int order = 1;
 
 
