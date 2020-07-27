@@ -21,9 +21,10 @@ int main(int argc, char *argv[])
    const char *device_config = "cpu";
 
 OptionsParser args(argc, argv);
-/*
+   const char *mesh_file = "./data/semi_circle3.msh"; 
    args.AddOption(&mesh_file, "-m", "--mesh",
                   "Mesh file to use.");
+/*   
    args.AddOption(&order, "-o", "--order",
                   "Finite element order (polynomial degree) or -1 for"
                   " isoparametric space.");
@@ -36,15 +37,18 @@ OptionsParser args(argc, argv);
                   "Device configuration string, see Device::Configure().");
    
    args.Parse();
+   if (!args.Good())
+   {
+      args.PrintUsage(cout);
+      return 1;
+   }   
+   args.PrintOptions(cout);   
    Device device(device_config);
    device.Print();
 
    std::cout << "made it past device print";
 
 
-
-
-  const char *mesh_file = "./data/semi_circle3.msh";
   int order = 1;
 
 
