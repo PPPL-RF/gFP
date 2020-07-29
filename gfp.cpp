@@ -7,6 +7,7 @@ using namespace std;
 using namespace mfem;
 
 void matFun(const Vector &, DenseMatrix &);
+void matFunSym(const Vector &, Vector&);
 void vecFun(const Vector &, Vector&);
 double scalFun(const Vector & x);
 double testFun(const Vector & x);
@@ -46,10 +47,7 @@ OptionsParser args(argc, argv);
    Device device(device_config);
    device.Print();
 
-   std::cout << "made it past device print";
-
-
-  int order = 1;
+  int order = 2;
 
 
   
@@ -58,13 +56,8 @@ OptionsParser args(argc, argv);
 
   
   mesh->UniformRefinement();
-  //mesh->UniformRefinement();
-  //mesh->UniformRefinement();
+  mesh->UniformRefinement();
   
-   
-
-
-
   FiniteElementCollection *fec;
 
   if (order > 0) {
@@ -87,25 +80,25 @@ OptionsParser args(argc, argv);
     {
       Array<int> ess_bdr(mesh->bdr_attributes.Max());
       ess_bdr=0;
-      ess_bdr[0]=1;
+      ess_bdr[2]=1;
       ess_bdr[3]=1;
       fespace->GetEssentialTrueDofs(ess_bdr, ess_tdof_list);
       //ess_bdr.Print();
     }
 
-  std::cout << "made it past bdr";
  
 LinearForm *b = new LinearForm(fespace);
 ConstantCoefficient zero(0.0);
 b->AddDomainIntegrator(new DomainLFIntegrator(zero));
 b->Assemble();
- std::cout << "made it past b assembly";
 GridFunction x(fespace);
 x=1.0;
 
 BilinearForm *a = new BilinearForm(fespace);
 if (pa) { a->SetAssemblyLevel(AssemblyLevel::PARTIAL); }
- int sdim = mesh->SpaceDimension();
+ int sdim = mesh->Dimension();
+
+ std::cout << "mesh dim " << sdim << "\n";
  /*
 double z[2];	 
  Vector v(z, 2);
@@ -114,11 +107,7 @@ double z[2];
  DenseMatrix m(2,2);
  matFun(v,m);
  */
- 
- MatrixFunctionCoefficient matFunCo(sdim,matFun);
- //ConstantCoefficient one(1.0);
- a->AddDomainIntegrator(new DiffusionIntegrator(matFunCo));
- 
+
  VectorFunctionCoefficient vecFunCo(sdim, vecFun);
  //a->AddDomainIntegrator(new MixedDirectionalDerivativeIntegrator(vecFunCo));
  a->AddDomainIntegrator(new ConvectionIntegrator(vecFunCo)); 
@@ -126,10 +115,16 @@ double z[2];
  FunctionCoefficient scalFunCo(scalFun);
  a->AddDomainIntegrator(new MassIntegrator(scalFunCo));
  
+ // MatrixFunctionCoefficient matFunCo(sdim,matFun);
+ MatrixFunctionCoefficient matFunCo(sdim,matFunSym);
+ matFunCo.SetSymmetric(true);
+ a->AddDomainIntegrator(new DiffusionIntegrator(matFunCo));
+ //std::cout << "Symmetric" << matFunCo.IsSymmetric() << "\n";
+ 
 a->Assemble();
  std::cout << "past a assembly";
-OperatorPtr A;
-//SparseMatrix A;
+ OperatorPtr A;
+ //SparseMatrix A;
 Vector B, X;
 a->FormLinearSystem(ess_tdof_list, x, *b, A, X, B);
 
@@ -167,28 +162,30 @@ if (UsesTensorBasis(*fespace))
    }
 */
 
+ 
 
-//GSSmoother M(A);
 
  GMRESSolver *j_gmres = new GMRESSolver();
  j_gmres->iterative_mode = false; 
-   j_gmres->SetRelTol(1e-16);
-   j_gmres->SetAbsTol(1e-16);
+   j_gmres->SetRelTol(1e-8);
+   j_gmres->SetAbsTol(0);
    j_gmres->SetMaxIter(300);
    j_gmres->SetPrintLevel(-1);
-   //j_gmres->SetPreconditioner(M);
+   if (! pa) {
+       GSSmoother M((SparseMatrix&)(*A));     
+       j_gmres->SetPreconditioner(M);
+   }
    j_gmres->SetOperator(*A);
 
    FGMRESSolver *fgmres = new FGMRESSolver();
-   fgmres-> SetRelTol(1e-21);
-   fgmres-> SetAbsTol(1e-21);
-   fgmres-> SetMaxIter(200);
+   fgmres-> SetRelTol(1e-12);
+   fgmres-> SetAbsTol(0);
+   fgmres-> SetMaxIter(8000);
    fgmres-> SetKDim(70);
    fgmres-> SetPrintLevel(1);
    fgmres-> SetOperator(*A);
    fgmres-> SetPreconditioner(*j_gmres);
    fgmres->Mult(B,X);
-
 
 a->RecoverFEMSolution(X, *b, x);
 
@@ -221,6 +218,17 @@ vector<double> coefficients = FPCo(velocities);
   m(1,0)=coefficients[5];
   m(1,1)=coefficients[6]; 
 
+  //std::cout << "end of mat \n ";
+}
+
+void matFunSym(const Vector & x, Vector & K)
+{
+  vector<double> velocities = prelimFPCo(x); 
+  vector<double> coefficients = FPCo(velocities);
+
+  K(0)=coefficients[3];
+  K(1)=coefficients[4];
+  K(2)=coefficients[6];
   //std::cout << "end of mat \n ";
 }
 
