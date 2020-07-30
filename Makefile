@@ -19,10 +19,10 @@ default: build buildp
 gFP:
 build: gfp.o
 	echo $(CONFIG_MK)
-	$(MFEM_CXX) $(MFEM_FLAGS) -o gFP $< $(MFEMLIB) $(MFEM_LIBS)
+	$(MFEM_CXX) -ccbin mpicxx -o gFP $< $(MFEMLIB) $(MFEM_LIBS)
 
 buildp: pgfp.o
-	$(MFEM_CXX) $(MFEM_FLAGS) -o pgFP $< $(MFEMLIB) $(MFEM_LIBS)
+	$(MFEM_CXX) -ccbin mpicxx -o pgFP $< $(MFEMLIB) $(MFEM_LIBS)
 
 clean:
 	rm -f *.o

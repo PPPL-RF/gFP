@@ -116,16 +116,25 @@ if (pa) { a.SetAssemblyLevel(AssemblyLevel::PARTIAL); }
  VectorFunctionCoefficient vecFunCo(sdim, vecFun);
  a.AddDomainIntegrator(new ConvectionIntegrator(vecFunCo)); 
 
+
+
  MatrixFunctionCoefficient constMatFunCo(sdim,constMat);
  a.AddDomainIntegrator(new DiffusionIntegrator(constMatFunCo));
 
  FunctionCoefficient scalFunCo(scalFun);
  a.AddDomainIntegrator(new MassIntegrator(scalFunCo));
  
-
+if (pa) {
  MatrixFunctionCoefficient matFunCo(sdim,matFunSym);
  matFunCo.SetSymmetric(true);
  a.AddDomainIntegrator(new DiffusionIntegrator(matFunCo));
+ }
+ else {
+MatrixFunctionCoefficient matFunCo(sdim,matFun);
+ a.AddDomainIntegrator(new DiffusionIntegrator(matFunCo));
+ }
+
+
  
  a.Assemble();
 
@@ -168,22 +177,22 @@ if (UsesTensorBasis(*fespace))
    }
 */
 
- 
+ Solver *prec = NULL;
 
-
- GMRESSolver *j_gmres = new GMRESSolver();
+ GMRESSolver *j_gmres = new GMRESSolver(MPI_COMM_WORLD);
  j_gmres->iterative_mode = false; 
    j_gmres->SetRelTol(1e-8);
    j_gmres->SetAbsTol(0);
    j_gmres->SetMaxIter(300);
    j_gmres->SetPrintLevel(-1);
-   if (! pa) {
-       GSSmoother M((SparseMatrix&)(*A));     
-       j_gmres->SetPreconditioner(M);
-   }
    j_gmres->SetOperator(*A);
+   if (! pa) {     
+    prec = new HypreBoomerAMG((HypreParMatrix &)(*A));
+   j_gmres->SetPreconditioner(*prec);
+   }
+   
 
-   FGMRESSolver *fgmres = new FGMRESSolver();
+   FGMRESSolver *fgmres = new FGMRESSolver(MPI_COMM_WORLD);
    fgmres-> SetRelTol(1e-12);
    fgmres-> SetAbsTol(0);
    fgmres-> SetMaxIter(8000);
@@ -213,7 +222,19 @@ a.RecoverFEMSolution(X, b, x);
  //delete *a;
  //delete *b;
  //delete fespace;
- //delete fec;
+ //delete mesh;
+
+ if (!pa){
+ delete fec;
+ delete fgmres;
+ delete prec;
+ }
+ else {
+   delete fec;
+   delete fgmres;
+ }
+
+ //delete j_gmres;
  MPI_Finalize();
 
 
@@ -337,7 +358,6 @@ const double ma = 9.1093837015e-31;
 const double mb = 9.1093837015e-31;
 const double pi = 3.1415926535897932;
 const double ee = 1.602176634e-19;
-const double em = 2.718281828459045;
 const double gama = 4.0*pi*pow(Za,4.0)*pow(ee,4.0)/pow(ma,2.0);
 //std::cout << "first\n";
  double x0,x1,theta,vel;

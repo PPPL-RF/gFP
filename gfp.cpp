@@ -2,9 +2,11 @@
 #include <fstream>
 #include <iostream>
 #include <cmath>
+//#include <chrono>
 
 using namespace std;
 using namespace mfem;
+//using namespace std::chrono;
 
 void matFun(const Vector &, DenseMatrix &);
 void matFunSym(const Vector &, Vector&);
@@ -13,16 +15,20 @@ double scalFun(const Vector & x);
 double testFun(const Vector & x);
 vector<double> FPCo(const vector<double> & v);
 vector<double> prelimFPCo(const Vector & v);
+void constMat(const Vector & x, DenseMatrix & m);
 
 
 int main(int argc, char *argv[])
 {
 
+  //auto start = high_resolution_clock::now();
+
+  int order = 1;
    bool pa = false;
    const char *device_config = "cpu";
 
 OptionsParser args(argc, argv);
-   const char *mesh_file = "./data/semi_circle3.msh"; 
+   const char *mesh_file = "./data/semi_circle5_quad.msh"; 
    args.AddOption(&mesh_file, "-m", "--mesh",
                   "Mesh file to use.");
 /*   
@@ -47,7 +53,7 @@ OptionsParser args(argc, argv);
    Device device(device_config);
    device.Print();
 
-  int order = 2;
+  
 
 
   
@@ -55,6 +61,7 @@ OptionsParser args(argc, argv);
   int dim = mesh->Dimension();
 
   
+  mesh->UniformRefinement();
   mesh->UniformRefinement();
   mesh->UniformRefinement();
   
@@ -98,7 +105,7 @@ BilinearForm *a = new BilinearForm(fespace);
 if (pa) { a->SetAssemblyLevel(AssemblyLevel::PARTIAL); }
  int sdim = mesh->Dimension();
 
- std::cout << "mesh dim " << sdim << "\n";
+ //std::cout << "mesh dim " << sdim << "\n";
  /*
 double z[2];	 
  Vector v(z, 2);
@@ -112,15 +119,23 @@ double z[2];
  //a->AddDomainIntegrator(new MixedDirectionalDerivativeIntegrator(vecFunCo));
  a->AddDomainIntegrator(new ConvectionIntegrator(vecFunCo)); 
 
+MatrixFunctionCoefficient constMatFunCo(sdim,constMat);
+ a->AddDomainIntegrator(new DiffusionIntegrator(constMatFunCo));
+
  FunctionCoefficient scalFunCo(scalFun);
  a->AddDomainIntegrator(new MassIntegrator(scalFunCo));
  
- // MatrixFunctionCoefficient matFunCo(sdim,matFun);
+if (pa) {
  MatrixFunctionCoefficient matFunCo(sdim,matFunSym);
  matFunCo.SetSymmetric(true);
  a->AddDomainIntegrator(new DiffusionIntegrator(matFunCo));
- //std::cout << "Symmetric" << matFunCo.IsSymmetric() << "\n";
- 
+ }
+ else {
+MatrixFunctionCoefficient matFunCo(sdim,matFun);
+ a->AddDomainIntegrator(new DiffusionIntegrator(matFunCo));
+ }
+
+
 a->Assemble();
  std::cout << "past a assembly";
  OperatorPtr A;
@@ -202,6 +217,12 @@ delete fespace;
 delete fec;
 delete mesh;
 
+
+//auto stop = high_resolution_clock::now();
+//auto duration =duration_cast<seconds>(stop-start);
+//cout << duration.count() << endl;
+
+
 return 0;
 }
 
@@ -219,6 +240,23 @@ vector<double> coefficients = FPCo(velocities);
   m(1,1)=coefficients[6]; 
 
   //std::cout << "end of mat \n ";
+}
+
+void constMat(const Vector & x, DenseMatrix & m)
+{
+
+  double w1,w2; 
+ w1 = 0.5;
+ w2 = 0.8;
+ m(0,1) = 0;
+ m(1,0) = 0;
+ m(1,1) = 0;
+ m(0,0) = 0;
+
+ if ((x(0) < w2) & (x(0) > w1)){
+   //m(1,1) = ;
+    m(0,0) = -1.e-10; 
+ }
 }
 
 void matFunSym(const Vector & x, Vector & K)
