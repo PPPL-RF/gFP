@@ -10,7 +10,7 @@ OFILE = $(CXXFILE:.cpp=.o)
 
 .PHONY: all clean build clean-build
 
-default: build buildp
+default: build buildp buildo
 
 
 %.o: %.cpp
@@ -24,7 +24,12 @@ build: gfp.o
 buildp: pgfp.o
 	$(MFEM_CXX) -ccbin mpicxx -o pgFP $< $(MFEMLIB) $(MFEM_LIBS)
 
+buildo: gFPOut.o
+	echo $(CONFIG_MK)
+	$(MFEM_CXX) -ccbin mpicxx -o gFPOut $< $(MFEMLIB) $(MFEM_LIBS)
+
 clean:
 	rm -f *.o
 	rm -f gFP
 	rm -f pgFP
+	rm -f gFPOut

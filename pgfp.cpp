@@ -2,9 +2,11 @@
 #include <fstream>
 #include <iostream>
 #include <cmath>
+#include <chrono>
 
 using namespace std;
 using namespace mfem;
+using namespace std::chrono;
 
 void matFun(const Vector &, DenseMatrix &);
 void matFunSym(const Vector &, Vector&);
@@ -32,7 +34,7 @@ OptionsParser args(argc, argv);
    const char *device_config = "cpu";
    const char *mesh_file = "./data/semi_circle5_quad.msh"; 
    int order = 1;
-   int refinement = 1;
+   int refinement = 3;
    
    args.AddOption(&mesh_file, "-m", "--mesh",
                   "Mesh file to use.");   
@@ -61,8 +63,10 @@ OptionsParser args(argc, argv);
    Device device(device_config);
    device.Print();
 
-
+   //for (int j = 1; j < 6; j++) {
   
+ auto start = high_resolution_clock::now();
+
   Mesh *mesh = new Mesh(mesh_file, 1, 1);
   int dim = mesh->Dimension();
 
@@ -186,17 +190,17 @@ if (UsesTensorBasis(*fespace))
    j_gmres->SetMaxIter(300);
    j_gmres->SetPrintLevel(-1);
    j_gmres->SetOperator(*A);
-   if (! pa) {     
-    prec = new HypreBoomerAMG((HypreParMatrix &)(*A));
-   j_gmres->SetPreconditioner(*prec);
-   }
+   //if (! pa) {     
+   //prec = new HypreBoomerAMG((HypreParMatrix &)(*A));
+   //j_gmres->SetPreconditioner(*prec);
+   //}
    
 
    FGMRESSolver *fgmres = new FGMRESSolver(MPI_COMM_WORLD);
-   fgmres-> SetRelTol(1e-12);
+   fgmres-> SetRelTol(1e-14);
    fgmres-> SetAbsTol(0);
    fgmres-> SetMaxIter(8000);
-   fgmres-> SetKDim(70);
+   fgmres-> SetKDim(60);
    fgmres-> SetPrintLevel(1);
    fgmres-> SetOperator(*A);
    fgmres-> SetPreconditioner(*j_gmres);
@@ -234,6 +238,11 @@ a.RecoverFEMSolution(X, b, x);
    delete fgmres;
  }
 
+ auto stop = high_resolution_clock::now();
+ auto duration =duration_cast<microseconds>(stop-start);
+ cout << "time is " <<duration.count() << endl;
+
+ //}
  //delete j_gmres;
  MPI_Finalize();
 
@@ -353,14 +362,14 @@ const double Zb = 1.;
 const double Za = 1.;
 const double nb = 1.0e20;
 const double vb = 8.8e6; 
-const double va=vb*3.0;
+const double va=vb*5.0;
 const double ma = 9.1093837015e-31;
 const double mb = 9.1093837015e-31;
 const double pi = 3.1415926535897932;
 const double ee = 1.602176634e-19;
 const double gama = 4.0*pi*pow(Za,4.0)*pow(ee,4.0)/pow(ma,2.0);
 //std::cout << "first\n";
- double x0,x1,theta,vel;
+ double x1,x0,theta,vel;
  x0=v[0]*va;
  x1=v[1]*va;
  vel=v[2]*va;

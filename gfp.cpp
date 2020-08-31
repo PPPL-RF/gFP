@@ -2,11 +2,15 @@
 #include <fstream>
 #include <iostream>
 #include <cmath>
-//#include <chrono>
+#include <chrono>
 
 using namespace std;
 using namespace mfem;
-//using namespace std::chrono;
+using namespace std::chrono;
+
+double w1=0.3;
+double w2=0.5;
+double D=1.e-3;
 
 void matFun(const Vector &, DenseMatrix &);
 void matFunSym(const Vector &, Vector&);
@@ -15,34 +19,65 @@ double scalFun(const Vector & x);
 double testFun(const Vector & x);
 vector<double> FPCo(const vector<double> & v);
 vector<double> prelimFPCo(const Vector & v);
-void constMat(const Vector & x, DenseMatrix & m);
+//void constMat(const Vector & x, DenseMatrix & m);
+void constMat(const Vector & x, DenseMatrix & m)
+{
 
+  //double w1,w2;
+  double fac,pi; 
+  //w1 = 0.3;
+  //w2 = 0.5;
+  fac=5.;
+  pi=3.141592;
+ m(0,1) = 0;
+ m(1,0) = 0;
+ m(1,1) = 0;
+ m(0,0) = 0;
+
+ //if ((x(0) < w2) & (x(0) > w1)){
+ m(0,0) =-((tanh((x(0)-w1)*2*pi*fac)+1)*(tanh(-1*(x(0)-w2)*2*pi*fac)+1))/4*D;
+ //}
+}
 
 int main(int argc, char *argv[])
 {
 
-  //auto start = high_resolution_clock::now();
+  
 
-  int order = 1;
-   bool pa = false;
-   const char *device_config = "cpu";
+  
 
 OptionsParser args(argc, argv);
+ int refinement = 3; 
+ int order = 2;
+   bool pa = false;
+   const char *device_config = "cpu";
    const char *mesh_file = "./data/semi_circle5_quad.msh"; 
+
    args.AddOption(&mesh_file, "-m", "--mesh",
                   "Mesh file to use.");
-/*   
+  
    args.AddOption(&order, "-o", "--order",
                   "Finite element order (polynomial degree) or -1 for"
                   " isoparametric space.");
-   args.AddOption(&static_cond, "-sc", "--static-condensation", "-no-sc",
-                  "--no-static-condensation", "Enable static condensation.");
-*/
+
    args.AddOption(&pa, "-pa", "--partial-assembly", "-no-pa",
                   "--no-partial-assembly", "Enable Partial Assembly.");
+
    args.AddOption(&device_config, "-d", "--device",
                   "Device configuration string, see Device::Configure().");
+
+   args.AddOption(&refinement, "-r", "--refine",
+		  "number of refinements of the mesh"
+		  "increases accuracy and computation time");
+   args.AddOption(&w1, "-w1", "--Bound1","LH term lower bound");
+   args.AddOption(&w2, "-w2", "--Bound2","LH term upper bound");
+   args.AddOption(&D, "-D", "--LHmaxValue","LH term coefficient max value");
+
    
+     
+   
+
+
    args.Parse();
    if (!args.Good())
    {
@@ -54,16 +89,18 @@ OptionsParser args(argc, argv);
    device.Print();
 
   
+   //for (int j = 1; j < 6; j++) {
 
 
-  
+ auto start = high_resolution_clock::now();
+
+   //start loop 
   Mesh *mesh = new Mesh(mesh_file, 1, 1);
   int dim = mesh->Dimension();
 
-  
+  for (int i =0; i < refinement; i++) { 
   mesh->UniformRefinement();
-  mesh->UniformRefinement();
-  mesh->UniformRefinement();
+  }
   
   FiniteElementCollection *fec;
 
@@ -116,11 +153,10 @@ double z[2];
  */
 
  VectorFunctionCoefficient vecFunCo(sdim, vecFun);
- //a->AddDomainIntegrator(new MixedDirectionalDerivativeIntegrator(vecFunCo));
  a->AddDomainIntegrator(new ConvectionIntegrator(vecFunCo)); 
 
 MatrixFunctionCoefficient constMatFunCo(sdim,constMat);
- a->AddDomainIntegrator(new DiffusionIntegrator(constMatFunCo));
+a->AddDomainIntegrator(new DiffusionIntegrator(constMatFunCo));
 
  FunctionCoefficient scalFunCo(scalFun);
  a->AddDomainIntegrator(new MassIntegrator(scalFunCo));
@@ -136,12 +172,11 @@ MatrixFunctionCoefficient matFunCo(sdim,matFun);
  }
 
 
-a->Assemble();
- std::cout << "past a assembly";
+ a->Assemble();
  OperatorPtr A;
  //SparseMatrix A;
-Vector B, X;
-a->FormLinearSystem(ess_tdof_list, x, *b, A, X, B);
+ Vector B, X;
+ a->FormLinearSystem(ess_tdof_list, x, *b, A, X, B);
 
 /*
  FunctionCoefficient testCo(testFun);
@@ -187,16 +222,16 @@ if (UsesTensorBasis(*fespace))
    j_gmres->SetMaxIter(300);
    j_gmres->SetPrintLevel(-1);
    if (! pa) {
-       GSSmoother M((SparseMatrix&)(*A));     
-       j_gmres->SetPreconditioner(M);
+     GSSmoother M((SparseMatrix&)(*A));     
+     j_gmres->SetPreconditioner(M);
    }
    j_gmres->SetOperator(*A);
 
    FGMRESSolver *fgmres = new FGMRESSolver();
-   fgmres-> SetRelTol(1e-12);
+   fgmres-> SetRelTol(1e-16);
    fgmres-> SetAbsTol(0);
    fgmres-> SetMaxIter(8000);
-   fgmres-> SetKDim(70);
+   fgmres-> SetKDim(60);
    fgmres-> SetPrintLevel(1);
    fgmres-> SetOperator(*A);
    fgmres-> SetPreconditioner(*j_gmres);
@@ -217,11 +252,11 @@ delete fespace;
 delete fec;
 delete mesh;
 
-
-//auto stop = high_resolution_clock::now();
-//auto duration =duration_cast<seconds>(stop-start);
-//cout << duration.count() << endl;
-
+ 
+ auto stop = high_resolution_clock::now();
+ auto duration =duration_cast<microseconds>(stop-start);
+ cout << "time is " <<duration.count() << endl;
+   
 
 return 0;
 }
@@ -242,22 +277,7 @@ vector<double> coefficients = FPCo(velocities);
   //std::cout << "end of mat \n ";
 }
 
-void constMat(const Vector & x, DenseMatrix & m)
-{
 
-  double w1,w2; 
- w1 = 0.5;
- w2 = 0.8;
- m(0,1) = 0;
- m(1,0) = 0;
- m(1,1) = 0;
- m(0,0) = 0;
-
- if ((x(0) < w2) & (x(0) > w1)){
-   //m(1,1) = ;
-    m(0,0) = -1.e-10; 
- }
-}
 
 void matFunSym(const Vector & x, Vector & K)
 {
@@ -336,14 +356,13 @@ vector<double> FPCo(const vector<double> & v){
 const double CoulLog = 15.;
 const double Zb = 1.;
 const double Za = 1.;
-const double nb = 1.0e20;
+ const double nb = 1.530e27;//1.9e+26; //1.0e20;
 const double vb = 8.8e6; 
-const double va=vb*3.0;
+const double va=vb*5.0;
 const double ma = 9.1093837015e-31;
 const double mb = 9.1093837015e-31;
 const double pi = 3.1415926535897932;
 const double ee = 1.602176634e-19;
-const double em = 2.718281828459045;
 const double gama = 4.0*pi*pow(Za,4.0)*pow(ee,4.0)/pow(ma,2.0);
 //std::cout << "first\n";
  double x0,x1,theta,vel;
