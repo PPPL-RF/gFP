@@ -2,3 +2,5 @@
 *.o
 *.gf
 gFP
+bdr_mesh.msh
+right_2d.msh
